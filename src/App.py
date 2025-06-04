@@ -1,15 +1,17 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from tkinter import ttk
+from PIL import Image, ImageTk
 
 from Calculation import Calculation
 from Einkaufsliste import Einkaufsliste
 from config import workbooks_default, laden_default, lieferanten_default
+import os
 
 class App:
     def __init__(self, root):
         self.root = root
-        self.root.title("Wochenplaner Tool")
+        self.root.title("Zeltlager SUKU")
 
         # Werte
         self.mode = tk.StringVar(value="calculation")
@@ -18,6 +20,7 @@ class App:
         self.workbooks = tk.StringVar()
         self.output_path = tk.StringVar()
         self.läden = tk.StringVar()
+        self.lieferanten = tk.StringVar()
 
         # UI-Elemente
         self.create_widgets()
@@ -47,13 +50,18 @@ class App:
         ttk.Entry(self.root, textvariable=self.output_path).grid(row=4, column=1, sticky="ew")
         ttk.Button(self.root, text="Durchsuchen", command=self.browse_output_folder).grid(row=4, column=2)
 
-        # Läden/Lieferanten
+        # Laden
         self.läden = tk.StringVar(value=", ".join(laden_default))
-        ttk.Label(self.root, text="Laden/Lieferanten (kommagetrennt):").grid(row=5, column=0, sticky="w")
+        ttk.Label(self.root, text="Laden (kommagetrennt):").grid(row=5, column=0, sticky="w")
         ttk.Entry(self.root, textvariable=self.läden).grid(row=5, column=1, sticky="ew")
 
+        # Lieferanten
+        self.lieferanten = tk.StringVar(value=", ".join(lieferanten_default))
+        ttk.Label(self.root, text="Lieferanten (kommagetrennt):").grid(row=6, column=0, sticky="w")
+        ttk.Entry(self.root, textvariable=self.lieferanten).grid(row=6, column=1, sticky="ew")
+
         # Start Button
-        ttk.Button(self.root, text="Start", command=self.run_tool).grid(row=6, column=0, columnspan=3, pady=10)
+        ttk.Button(self.root, text="Start", command=self.run_tool).grid(row=7, column=0, columnspan=3, pady=10)
 
     def browse_file(self):
         file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xlsm *.xls")])
@@ -96,8 +104,16 @@ class App:
 
 
 if __name__ == "__main__":
-    import os
     root = tk.Tk()
     root.geometry("700x300")
+    
+# Icon setzen
+    try:
+        icon_image = Image.open("../img/logo_smj_ulm.jpg")
+        icon_photo = ImageTk.PhotoImage(icon_image)
+        root.iconphoto(False, icon_photo)
+    except Exception as e:
+        print(f"Fehler beim Laden des Icons: {e}")
+
     app = App(root)
     root.mainloop()

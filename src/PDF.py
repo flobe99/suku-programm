@@ -12,45 +12,49 @@ class PDF:
         def draw_header(canvas, doc):
             canvas.saveState()
             canvas.setFont('Helvetica-Bold', 10)
-            canvas.drawRightString(A4[0] - 2*cm, A4[1] - 1.5*cm, "Zeltlager 2025")
+            # canvas.drawRightString(A4[0] - 2*cm, A4[1] - 1.5*cm, "Zeltlager 2025")
             canvas.restoreState()
 
-        doc = SimpleDocTemplate(filename, pagesize=A4)
+        doc = SimpleDocTemplate(
+            filename,
+            pagesize=A4,
+            topMargin=1*cm,
+            bottomMargin=1*cm)
         styles = getSampleStyleSheet()
         elements = []
 
         elements.append(Paragraph(f"{tag.wochentag} – {tag.datum}", styles['Title']))
-        elements.append(Spacer(1, 12))
+        # elements.append(Spacer(1, 12))
 
         for _gericht in tag.gericht:
             header_text = f"<b>{_gericht.mahlzeit}</b> – {_gericht.gerichtname} ({_gericht.uhrzeit})"
             elements.append(Paragraph(header_text, styles['Heading2']))
-            elements.append(Spacer(1, 6))
+            # elements.append(Spacer(1, 6))
 
             data = [[
+                'Artikelname',
                 'Menge',
                 'Einheit',
-                'Artikelname',
                 'Faktor',
                 'Kategorie',
                 'Lieferant',
                 'Sonstiges'
             ]]
 
-            cell_style = ParagraphStyle(name='CellStyle', fontSize=9, leading=11)
+            cell_style = ParagraphStyle(name='CellStyle', fontSize=7, leading=9)
 
             for z in _gericht.zutat:
                 data.append([
-                    f"{z.menge:.3f}",
-                    Paragraph(z.einheit, cell_style),
                     Paragraph(z.artikelname, cell_style),
+                    Paragraph(f"{z.menge:.3f}", cell_style),
+                    Paragraph(z.einheit, cell_style),
                     Paragraph(f"{z.faktor:.3f}" if z.faktor is not None else '-', cell_style),
                     Paragraph(z.kategorie or '-', cell_style),
                     Paragraph(z.lieferant, cell_style),
                     Paragraph(z.sonstiges or '-', cell_style)
                 ])
             
-            col_widths = [1.5*cm, 1.75*cm, 6*cm, 1.5*cm, 2*cm, 2.5*cm, 2.5*cm]
+            col_widths = [6*cm, 1.5*cm, 1.75*cm, 1.5*cm, 2*cm, 2.5*cm, 2.5*cm]
             table = Table(data, colWidths=col_widths, repeatRows=1)
             table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
@@ -61,9 +65,9 @@ class PDF:
             ]))
 
             elements.append(table)
-            elements.append(Spacer(1, 12))
+            # elements.append(Spacer(1, 12))
 
-        doc.build(elements, onFirstPage=draw_header, onLaterPages=draw_header)
+        doc.build(elements)
 
     def save_zutaten_as_table(laden, filename="speiseplan_table.pdf"):
         def draw_header(canvas, doc):
@@ -72,12 +76,17 @@ class PDF:
             canvas.drawRightString(A4[0] - 2*cm, A4[1] - 1.5*cm, "Zeltlager 2025")
             canvas.restoreState()
 
-        doc = SimpleDocTemplate(filename, pagesize=A4)
+        doc = SimpleDocTemplate(
+            filename,
+            pagesize=A4,
+            topMargin=1*cm,
+            bottomMargin=1*cm)
+        
         styles = getSampleStyleSheet()
         elements = []
 
         elements.append(Paragraph(f"{laden.Name}", styles['Title']))
-        elements.append(Spacer(1, 12))
+        # elements.append(Spacer(1, 12))
         
         data = [[
             'Menge',
@@ -111,6 +120,6 @@ class PDF:
         ]))
 
         elements.append(table)
-        elements.append(Spacer(1, 12))
+        # elements.append(Spacer(1, 12))
 
-        doc.build(elements, onFirstPage=draw_header, onLaterPages=draw_header)
+        doc.build(elements)
