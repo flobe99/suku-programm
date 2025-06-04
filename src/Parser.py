@@ -1,6 +1,6 @@
 import argparse
 import os
-
+from config import workbooks_default, laden_default, lieferanten_default
 
 class Parser:
     def argument():
@@ -14,39 +14,15 @@ class Parser:
         parser.add_argument(
             "-w", "--workbooks",
             help="Excel workbooks",
-            default= [
-                "Aufbau",
-                "Samstag",
-                "Sonntag",
-                "Montag",
-                "Dienstag",
-                "Mittwoch",
-                "Donnerstag",
-                "Freitag",
-                "Abbau",
-                "Allgemeines"
-            ])
+            default= workbooks_default)
         parser.add_argument(
             "-l", "--laden",
             help="Einkaufsladen liste",
-            default= [
-                "Aldi",
-                "Metro",
-                "Netto",                
-                "Sonstiges",
-                "None"
-            ])
+            default= laden_default)
         parser.add_argument(
             "-li", "--lieferanten",
             help="Lieferanten liste",
-            default= [
-                "Becka Beck",
-                "Schmutz",
-                "Jermi",                
-                "Reichardt",
-                "Bauer Barth",
-                "None"
-            ])
+            default= lieferanten_default)
         
         args = parser.parse_args()
         

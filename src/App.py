@@ -4,6 +4,7 @@ from tkinter import ttk
 
 from Calculation import Calculation
 from Einkaufsliste import Einkaufsliste
+from config import workbooks_default, laden_default, lieferanten_default
 
 class App:
     def __init__(self, root):
@@ -28,15 +29,16 @@ class App:
 
         # Datei auswählen
         ttk.Label(self.root, text="Excel-Datei:").grid(row=1, column=0, sticky="w")
-        ttk.Entry(self.root, textvariable=self.filename).grid(row=1, column=1, sticky="ew")
+        ttk.Entry(self.root, textvariable=self.filename, width=60).grid(row=1, column=1, sticky="ew")
         ttk.Button(self.root, text="Durchsuchen", command=self.browse_file).grid(row=1, column=2)
 
         # Basis-Pfad
         ttk.Label(self.root, text="Basis-Pfad:").grid(row=2, column=0, sticky="w")
-        ttk.Entry(self.root, textvariable=self.base_path).grid(row=2, column=1, sticky="ew")
+        ttk.Entry(self.root, textvariable=self.base_path, width=60).grid(row=2, column=1, sticky="ew")
         ttk.Button(self.root, text="Durchsuchen", command=self.browse_folder).grid(row=2, column=2)
 
         # Workbooks
+        self.workbooks = tk.StringVar(value=", ".join(workbooks_default))
         ttk.Label(self.root, text="Excel Blätter (kommagetrennt):").grid(row=3, column=0, sticky="w")
         ttk.Entry(self.root, textvariable=self.workbooks).grid(row=3, column=1, sticky="ew")
 
@@ -46,6 +48,7 @@ class App:
         ttk.Button(self.root, text="Durchsuchen", command=self.browse_output_folder).grid(row=4, column=2)
 
         # Läden/Lieferanten
+        self.läden = tk.StringVar(value=", ".join(laden_default))
         ttk.Label(self.root, text="Laden/Lieferanten (kommagetrennt):").grid(row=5, column=0, sticky="w")
         ttk.Entry(self.root, textvariable=self.läden).grid(row=5, column=1, sticky="ew")
 
@@ -53,7 +56,7 @@ class App:
         ttk.Button(self.root, text="Start", command=self.run_tool).grid(row=6, column=0, columnspan=3, pady=10)
 
     def browse_file(self):
-        file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls")])
+        file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xlsm *.xls")])
         if file_path:
             self.filename.set(file_path)
             self.base_path.set(os.path.dirname(file_path))
