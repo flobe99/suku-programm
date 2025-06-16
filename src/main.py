@@ -1,6 +1,7 @@
 from Calculation import Calculation
 from Einkaufsliste import Einkaufsliste
 from Parser import Parser
+from Lieferantenliste import Lieferantenliste
 
 if __name__ == "__main__":
 
@@ -26,7 +27,7 @@ if __name__ == "__main__":
             )
 
     elif args.mode == "lieferantenliste":
-        _einkaufsliste = Einkaufsliste()
+        _einkaufsliste = Lieferantenliste()
         _einkaufsliste.run(
             file_base_path=args.file_base_path,
             filename=args.filename,

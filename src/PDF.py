@@ -101,7 +101,7 @@ class PDF:
         cell_style = ParagraphStyle(name='CellStyle', fontSize=9, leading=11)
         for daten in laden.Zutaten:
             data.append([
-                f"{daten["menge"]:.3f}",
+                Paragraph(f'{daten["menge"]:.3f}',cell_style),
                 Paragraph(daten["einheit"], cell_style),
                 Paragraph(daten["artikelname"], cell_style),
                 Paragraph(daten["kategorie"] or '-', cell_style),

@@ -5,8 +5,10 @@ from PIL import Image, ImageTk
 
 from Calculation import Calculation
 from Einkaufsliste import Einkaufsliste
+from Lieferantenliste import Lieferantenliste
 from config import workbooks_default, laden_default, lieferanten_default
 import os
+
 
 class App:
     def __init__(self, root):
@@ -87,13 +89,17 @@ class App:
             workbooks = [w.strip() for w in self.workbooks.get().split(",") if w.strip()]
             output = self.output_path.get()
             läden = [l.strip() for l in self.läden.get().split(",") if l.strip()]
+            lieferanten = [l.strip() for l in self.lieferanten.get().split(",") if l.strip()]
 
             if mode == "calculation":
                 _calc = Calculation()
                 _calc.run(file_base_path=base_path, filename=filename, workbooks=workbooks, output=output)
-            elif mode in ("einkaufsliste", "lieferantenliste"):
+            elif mode == "einkaufsliste":
                 _einkaufsliste = Einkaufsliste()
                 _einkaufsliste.run(file_base_path=base_path, filename=filename, workbooks=workbooks, output=output, läden=läden)
+            elif mode == "lieferantenliste":
+                _lieferantenliste = Lieferantenliste()
+                _lieferantenliste.run(file_base_path=base_path, filename=filename, workbooks=workbooks, output=output, lieferanten=lieferanten)
             else:
                 messagebox.showerror("Fehler", f"Unbekannter Modus: {mode}")
                 return
