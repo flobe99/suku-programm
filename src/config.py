@@ -8,7 +8,8 @@ workbooks_default= [
     "Donnerstag",
     "Freitag",
     "Abbau",
-    "Allgemeines"
+    "Allgemeines",
+    "Reste"
 ]
 
 laden_default= [

@@ -37,11 +37,6 @@ class App:
         ttk.Entry(self.root, textvariable=self.filename, width=60).grid(row=1, column=1, sticky="ew")
         ttk.Button(self.root, text="Durchsuchen", command=self.browse_file).grid(row=1, column=2)
 
-        # Basis-Pfad
-        ttk.Label(self.root, text="Basis-Pfad:").grid(row=2, column=0, sticky="w")
-        ttk.Entry(self.root, textvariable=self.base_path, width=60).grid(row=2, column=1, sticky="ew")
-        ttk.Button(self.root, text="Durchsuchen", command=self.browse_folder).grid(row=2, column=2)
-
         # Workbooks
         self.workbooks = tk.StringVar(value=", ".join(workbooks_default))
         ttk.Label(self.root, text="Excel Blätter (kommagetrennt):").grid(row=3, column=0, sticky="w")
