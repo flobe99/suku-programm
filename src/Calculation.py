@@ -22,6 +22,8 @@ class Calculation:
             PDF.save_tag_as_table(tag, _filename)
             i+=1
 
+        PDF.save_in_one_file(target_folder, "Gesamt_Calc.pdf")
+
     def run(self, file_base_path, filename, workbooks, output):
         self._excel = Excel()
 

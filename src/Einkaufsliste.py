@@ -25,6 +25,8 @@ class Einkaufsliste:
             PDF.save_zutaten_as_table(laden, _filename)
             i+=1
 
+        PDF.save_in_one_file(target_folder, "Gesamt_Einkaufsliste.pdf")
+
     def create_einkaufsliste(self,tage, laden):
         zutaten = {}
         for tag in tage:

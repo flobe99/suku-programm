@@ -4,6 +4,8 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib import colors
 from reportlab.lib.units import cm
+from PyPDF2 import PdfMerger
+import os
 
 class PDF:
 
@@ -25,6 +27,45 @@ class PDF:
 
         elements.append(Paragraph(f"{tag.wochentag} – {tag.datum}", styles['Title']))
         # elements.append(Spacer(1, 12))
+
+        cell_style = ParagraphStyle(name='CellStyle', fontSize=7, leading=9)
+        data = []
+
+        data.append([
+                    Paragraph(f"Teilnehmer: {tag.people.participant}", cell_style),
+                    Paragraph(f"Zeltführer: {tag.people.tent}", cell_style),
+                    Paragraph(f"Freier Mann: {tag.people.free_man}", cell_style),
+                    Paragraph(f"Lageradmin: {tag.people.admin}", cell_style),
+                ])
+        
+        data.append([
+            Paragraph(f"Köche: {tag.people.cook}", cell_style),
+            Paragraph(f"Schützlinge: {tag.people.tent_place}", cell_style),
+            Paragraph(f"Leitungsteam: {tag.people.team}", cell_style),
+            Paragraph(f"Gesamt: {tag.people.sum}", cell_style),
+
+        ])
+        
+        col_widths = [4*cm, 4*cm, 4*cm, 4*cm]
+        table = Table(data, colWidths=col_widths)
+        table.setStyle(TableStyle([
+            # ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+        ]))
+
+        elements.append(table)
+
+        # elements.append(Paragraph(f"Teilnehmer: {tag.people.participant}"))
+        # elements.append(Paragraph(f"Zeltführer: {tag.people.tent}"))
+        # elements.append(Paragraph(f"Freier Mann: {tag.people.free_man}"))
+        # elements.append(Paragraph(f"Lageradmin: {tag.people.admin}"))
+        # elements.append(Paragraph(f"Köche: {tag.people.cook}"))
+        # elements.append(Paragraph(f"Gesamt: {tag.people.sum}"))
+        # elements.append(Paragraph(f"Schützlinge: {tag.people.tent_place}"))
+        # elements.append(Paragraph(f"Leitungsteam: {tag.people.team}"))
 
         for _gericht in tag.gericht:
             header_text = f"<b>{_gericht.mahlzeit}</b> – {_gericht.gerichtname} ({_gericht.uhrzeit})"
@@ -123,3 +164,29 @@ class PDF:
         # elements.append(Spacer(1, 12))
 
         doc.build(elements)
+
+    def save_in_one_file(target_folder, filename):
+        merger = PdfMerger()
+
+        gesamt_ordner = os.path.join(target_folder, "Gesamt")
+        os.makedirs(gesamt_ordner, exist_ok=True)
+
+        pdf_files = sorted([
+            f for f in os.listdir(target_folder)
+            if f.lower().endswith(".pdf") and os.path.isfile(os.path.join(target_folder, f))
+        ])
+
+        if not pdf_files:
+            print("No PDF files found in the specified folder.")
+            return
+
+        for pdf_file in pdf_files:
+            full_path = os.path.join(target_folder, pdf_file)
+            print(f"Adding file: {pdf_file}")
+            merger.append(full_path)
+
+        output_path = os.path.join(gesamt_ordner, filename)
+        merger.write(output_path)
+        merger.close()
+
+        print(f"Merged PDF saved to: {output_path}")

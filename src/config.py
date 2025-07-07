@@ -16,14 +16,14 @@ laden_default= [
     "Metro",
     "Netto",                
     "Sonstiges",
-    "None"
+    "None",
+    "Jermi",
+    "Reichardt",
+    "Bauer Barth"
 ]
 
 lieferanten_default= [
     "Becka Beck",
     "Schmutz",
-    "Jermi",                
-    "Reichardt",
-    "Bauer Barth",
     "None"
 ]
