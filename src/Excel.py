@@ -3,6 +3,7 @@ import openpyxl
 
 from Gericht import Gericht
 from Tag import Tag
+from People import People
 from Zutat import Zutat
 
 class Excel:
@@ -18,13 +19,38 @@ class Excel:
     def read_page(self, worksheet):
         self._page = self._file[worksheet]
         return self._page
+        
+    def read_people(self):
+        _participant = self._page['A2'].value
+        _tent = self._page['A3'].value
+        _free_man = self._page['A4'].value
+        _admin = self._page['A5'].value
+        _cook = self._page['A6'].value
+        _sum = self._page['A7'].value
+        _tent_place = self._page['A8'].value
+        _team = self._page['A9'].value
+
+        return People(
+            participant=_participant,
+            tent=_tent,
+            free_man=_free_man,
+            admin=_admin,
+            cook=_cook,
+            sum=_sum,
+            tent_place=_tent_place,
+            team=_team,
+        )
     
     def read_tag(self):
+
+        _people = self.read_people()
+
         _datum_raw = self._page['C12'].value
         _datum = _datum_raw.strftime("%d.%m.%Y") if isinstance(_datum_raw, datetime) else str(_datum_raw)
         _gericht:Gericht = self.read_gericht()
 
         _tag = Tag(
+            people=_people,
             datum=_datum,
             gericht=_gericht,
             wochentag=self._page.title
