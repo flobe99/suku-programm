@@ -1,10 +1,10 @@
 from datetime import datetime
 import openpyxl
 
-from Gericht import Gericht
-from Tag import Tag
-from People import People
-from Zutat import Zutat
+from models.Gericht import Gericht
+from models.Tag import Tag
+from models.People import People
+from models.Zutat import Zutat
 
 class Excel:
     
