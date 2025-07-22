@@ -1,3 +1,4 @@
+import re
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet
@@ -6,6 +7,8 @@ from reportlab.lib import colors
 from reportlab.lib.units import cm
 from PyPDF2 import PdfMerger
 import os
+
+from models import Zutat
 
 class PDF:
 

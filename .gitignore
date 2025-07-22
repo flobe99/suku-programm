@@ -4,3 +4,4 @@ src/__pycache__/*
 /src/App.spec
 /src/build/*
 /src/dist/*
+/src/models/__pycache__/** 

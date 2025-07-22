@@ -3,8 +3,8 @@ from typing import List
 
 from Excel import Excel
 from PDF import PDF
-from Tag import Tag
-from Laden import Laden
+from models.Tag import Tag
+from models.Laden import Laden
 
 class Einkaufsliste:
     _excel = None

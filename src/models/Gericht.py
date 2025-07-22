@@ -1,5 +1,5 @@
 
-from Zutat import Zutat
+from models.Zutat import Zutat
 
 class Gericht:
     zutat = []

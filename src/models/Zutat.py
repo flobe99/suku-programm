@@ -1,6 +1,6 @@
-from Lieferant import Lieferant
-from Kategorie import Kategorie
-from Einheit import Einheit
+from models.Lieferant import Lieferant
+from models.Kategorie import Kategorie
+from models.Einheit import Einheit
 
 class Zutat:
     def __init__(self, lieferant:Lieferant, kategorie:Kategorie, menge:Einheit, einheit:str, artikelname:str, faktor:float, sonstiges:str):
