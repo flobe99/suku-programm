@@ -19,12 +19,12 @@ laden_default= [
     "Sonstiges",
     "None",
     "Jermi",
-    "Reichardt",
     "Bauer Barth"
 ]
 
 lieferanten_default= [
     "Becka Beck",
     "Schmutz",
+    "Reichardt",
     "None"
 ]

@@ -174,10 +174,17 @@ class PDF:
         gesamt_ordner = os.path.join(target_folder, "Gesamt")
         os.makedirs(gesamt_ordner, exist_ok=True)
 
-        pdf_files = sorted([
+        pdf_files = [
             f for f in os.listdir(target_folder)
             if f.lower().endswith(".pdf") and os.path.isfile(os.path.join(target_folder, f))
-        ])
+        ]
+        def extract_prefix_number(file_name):
+            try:
+                return int(file_name.split("_")[0])
+            except (IndexError, ValueError):
+                return float('inf')
+            
+        pdf_files.sort(key=extract_prefix_number)
 
         if not pdf_files:
             print("No PDF files found in the specified folder.")
