@@ -1,0 +1,202 @@
+import re
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib import colors
+from reportlab.lib.units import cm
+from PyPDF2 import PdfMerger
+import os
+
+from models import Zutat
+
+class PDF:
+
+    def save_tag_as_table(tag, filename="speiseplan_table.pdf"):
+
+        def draw_header(canvas, doc):
+            canvas.saveState()
+            canvas.setFont('Helvetica-Bold', 10)
+            # canvas.drawRightString(A4[0] - 2*cm, A4[1] - 1.5*cm, "Zeltlager 2025")
+            canvas.restoreState()
+
+        doc = SimpleDocTemplate(
+            filename,
+            pagesize=A4,
+            topMargin=1*cm,
+            bottomMargin=1*cm)
+        styles = getSampleStyleSheet()
+        elements = []
+
+        elements.append(Paragraph(f"{tag.wochentag} – {tag.datum}", styles['Title']))
+        # elements.append(Spacer(1, 12))
+
+        cell_style = ParagraphStyle(name='CellStyle', fontSize=7, leading=9)
+        data = []
+
+        data.append([
+                    Paragraph(f"Teilnehmer: {tag.people.participant}", cell_style),
+                    Paragraph(f"Zeltführer: {tag.people.tent}", cell_style),
+                    Paragraph(f"Freier Mann: {tag.people.free_man}", cell_style),
+                    Paragraph(f"Lageradmin: {tag.people.admin}", cell_style),
+                ])
+        
+        data.append([
+            Paragraph(f"Köche: {tag.people.cook}", cell_style),
+            Paragraph(f"Schützlinge: {tag.people.tent_place}", cell_style),
+            Paragraph(f"Leitungsteam: {tag.people.team}", cell_style),
+            Paragraph(f"Gesamt: {tag.people.sum}", cell_style),
+
+        ])
+        
+        col_widths = [4*cm, 4*cm, 4*cm, 4*cm]
+        table = Table(data, colWidths=col_widths)
+        table.setStyle(TableStyle([
+            # ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+        ]))
+
+        elements.append(table)
+
+        # elements.append(Paragraph(f"Teilnehmer: {tag.people.participant}"))
+        # elements.append(Paragraph(f"Zeltführer: {tag.people.tent}"))
+        # elements.append(Paragraph(f"Freier Mann: {tag.people.free_man}"))
+        # elements.append(Paragraph(f"Lageradmin: {tag.people.admin}"))
+        # elements.append(Paragraph(f"Köche: {tag.people.cook}"))
+        # elements.append(Paragraph(f"Gesamt: {tag.people.sum}"))
+        # elements.append(Paragraph(f"Schützlinge: {tag.people.tent_place}"))
+        # elements.append(Paragraph(f"Leitungsteam: {tag.people.team}"))
+
+        for _gericht in tag.gericht:
+            header_text = f"<b>{_gericht.mahlzeit}</b> – {_gericht.gerichtname} ({_gericht.uhrzeit})"
+            elements.append(Paragraph(header_text, styles['Heading2']))
+            # elements.append(Spacer(1, 6))
+
+            data = [[
+                'Artikelname',
+                'Menge',
+                'Einheit',
+                'Faktor',
+                'Kategorie',
+                'Lieferant',
+                'Sonstiges'
+            ]]
+
+            cell_style = ParagraphStyle(name='CellStyle', fontSize=7, leading=9)
+
+            for z in _gericht.zutat:
+                data.append([
+                    Paragraph(z.artikelname, cell_style),
+                    Paragraph(f"{z.menge:.3f}", cell_style),
+                    Paragraph(z.einheit, cell_style),
+                    Paragraph(f"{z.faktor:.3f}" if z.faktor is not None else '-', cell_style),
+                    Paragraph(z.kategorie or '-', cell_style),
+                    Paragraph(z.lieferant, cell_style),
+                    Paragraph(z.sonstiges or '-', cell_style)
+                ])
+            
+            col_widths = [6*cm, 1.5*cm, 1.75*cm, 1.5*cm, 2*cm, 2.5*cm, 2.5*cm]
+            table = Table(data, colWidths=col_widths, repeatRows=1)
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+            ]))
+
+            elements.append(table)
+            # elements.append(Spacer(1, 12))
+
+        doc.build(elements)
+
+    def save_zutaten_as_table(laden, filename="speiseplan_table.pdf"):
+        def draw_header(canvas, doc):
+            canvas.saveState()
+            canvas.setFont('Helvetica-Bold', 10)
+            canvas.drawRightString(A4[0] - 2*cm, A4[1] - 1.5*cm, "Zeltlager 2025")
+            canvas.restoreState()
+
+        doc = SimpleDocTemplate(
+            filename,
+            pagesize=A4,
+            topMargin=1*cm,
+            bottomMargin=1*cm)
+        
+        styles = getSampleStyleSheet()
+        elements = []
+
+        elements.append(Paragraph(f"{laden.Name}", styles['Title']))
+        # elements.append(Spacer(1, 12))
+        
+        data = [[
+            'Menge',
+            'Einheit',
+            'Artikelname',
+            'Kategorie',
+            'Sonstiges',
+            'Tage',
+            ''
+        ]]
+
+        cell_style = ParagraphStyle(name='CellStyle', fontSize=9, leading=11)
+        for daten in laden.Zutaten:
+            data.append([
+                Paragraph(f'{daten["menge"]:.3f}',cell_style),
+                Paragraph(daten["einheit"], cell_style),
+                Paragraph(daten["artikelname"], cell_style),
+                Paragraph(daten["kategorie"] or '-', cell_style),
+                Paragraph(daten["sonstiges"] or '-', cell_style),
+                Paragraph(daten["tag"] or '-', cell_style)
+            ])
+            
+        col_widths = [1.5*cm, 1.75*cm, 4*cm, 2.5*cm, 3*cm, 4*cm,1*cm]
+        table = Table(data, colWidths=col_widths, repeatRows=1)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+        ]))
+
+        elements.append(table)
+        # elements.append(Spacer(1, 12))
+
+        doc.build(elements)
+
+    def save_in_one_file(target_folder, filename):
+        merger = PdfMerger()
+
+        gesamt_ordner = os.path.join(target_folder, "Gesamt")
+        os.makedirs(gesamt_ordner, exist_ok=True)
+
+        pdf_files = [
+            f for f in os.listdir(target_folder)
+            if f.lower().endswith(".pdf") and os.path.isfile(os.path.join(target_folder, f))
+        ]
+        def extract_prefix_number(file_name):
+            try:
+                return int(file_name.split("_")[0])
+            except (IndexError, ValueError):
+                return float('inf')
+            
+        pdf_files.sort(key=extract_prefix_number)
+
+        if not pdf_files:
+            print("No PDF files found in the specified folder.")
+            return
+
+        for pdf_file in pdf_files:
+            full_path = os.path.join(target_folder, pdf_file)
+            print(f"Adding file: {pdf_file}")
+            merger.append(full_path)
+
+        output_path = os.path.join(gesamt_ordner, filename)
+        merger.write(output_path)
+        merger.close()
+
+        print(f"Merged PDF saved to: {output_path}")
