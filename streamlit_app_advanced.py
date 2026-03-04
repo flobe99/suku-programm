@@ -191,12 +191,39 @@ else:
                                     st.session_state.abgehakte_artikel[laden][str(zutat_key)] = is_checked
                                 
                                 with col_umzug:
-                                    if st.selectbox(
-                                        "➡️",
-                                        ["Hierbleiben"] + [l for l in läden_list if l != laden],
+                                    # Optionen zum Verschieben: andere Läden + Lieferanten
+                                    move_options = ["Hierbleiben"]
+                                    move_options += [f"🏪 {l}" for l in läden_list if l != laden]
+                                    move_options += [f"🚚 {lf}" for lf in lieferanten_list if lf != laden]
+                                    
+                                    selected = st.selectbox(
+                                        "Zu:",
+                                        move_options,
                                         key=f"move_{laden}_{zutat_key}"
-                                    ) != "Hierbleiben":
-                                        st.info(f"✅ {zutat_info['artikelname']} markiert zum Verschieben")
+                                    )
+                                    
+                                    if selected != "Hierbleiben":
+                                        # Zielort extrahieren
+                                        if selected.startswith("🏪"):
+                                            new_destination = selected.replace("🏪 ", "")
+                                        else:  # 🚚
+                                            new_destination = selected.replace("🚚 ", "")
+                                        
+                                        # Ziel-Kategorie erstellen, wenn nicht vorhanden
+                                        if new_destination not in st.session_state.einkaufslisten_dict:
+                                            st.session_state.einkaufslisten_dict[new_destination] = {}
+                                        
+                                        # Artikel-Kopie erstellen und zu Ziel verschieben
+                                        artikel_copy = zutat_info.copy()
+                                        artikel_copy["lieferant"] = new_destination
+                                        st.session_state.einkaufslisten_dict[new_destination][zutat_key] = artikel_copy
+                                        
+                                        # Aus altem Ort entfernen
+                                        if zutat_key in st.session_state.einkaufslisten_dict[laden]:
+                                            del st.session_state.einkaufslisten_dict[laden][zutat_key]
+                                        
+                                        st.success(f"✅ '{zutat_info['artikelname']}' → {new_destination} verschoben!")
+                                        st.rerun()
                         else:
                             st.info("Keine Artikel für diesen Laden")
             
