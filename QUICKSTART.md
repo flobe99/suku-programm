@@ -1,0 +1,163 @@
+# ⚡ Streamlit Quick Start
+
+## 3 Schritte zum Starten
+
+### 1️⃣ PowerShell öffnen im Projektordner
+
+```powershell
+cd c:\Development\Sonstiges\suku-programm
+```
+
+### 2️⃣ Dependencies installieren (nur einmalig!)
+
+```powershell
+pip install -r requirements-streamlit.txt
+```
+
+### 3️⃣ App starten - Wählen Sie eine Version:
+
+**OPTION A: Basis-Version (empfohlen für Anfänger)**
+```powershell
+streamlit run streamlit_app.py
+```
+
+**OPTION B: Advanced-Version (mit Interaktivität beim Einkaufen)**
+```powershell
+streamlit run streamlit_app_advanced.py
+```
+
+---
+
+## 🎯 Was sich ändert
+
+### Tkinter GUI → Streamlit
+- ❌ Kein Desktop-Fenster mehr
+- ✅ Öffnet sich im Browser (lokal: http://localhost:8501)
+- ✅ Responsive Design (funktioniert auch auf Handy!)
+- ✅ Einfacheres Filehandling (Upload statt "Durchsuchen")
+
+---
+
+## 🛒 Workflow beim Einkaufen (mit Advanced Version)
+
+1. **App öffnen** → Excel hochladen
+2. **In Tab "🛒 Einkaufsliste"** gehen
+3. **Abhacken während Sie einkaufen**:
+   - Artikel abhacken mit Checkbox ✅
+   - Falls Artikel nicht im Shop: Mit Dropdown zu anderem Laden verschieben ➡️
+   - Spontane Idee? ➕ Im unteren Bereich hinzufügen
+4. **PDFs später downloaden** → Print oder mit zum nächsten Einkaufen
+
+---
+
+## 📊 Beide Versionen im Vergleich
+
+<table>
+  <tr>
+    <th>Feature</th>
+    <th>⚡ Basis</th>
+    <th>🚀 Advanced</th>
+  </tr>
+  <tr>
+    <td>Einkaufsliste ansehen</td>
+    <td>✅</td>
+    <td>✅</td>
+  </tr>
+  <tr>
+    <td>Artikel abhacken</td>
+    <td>❌</td>
+    <td>✅</td>
+  </tr>
+  <tr>
+    <td>Zwischen Läden verschieben</td>
+    <td>❌</td>
+    <td>✅</td>
+  </tr>
+  <tr>
+    <td>Spontan Artikel hinzufügen</td>
+    <td>❌</td>
+    <td>✅</td>
+  </tr>
+  <tr>
+    <td>CSV Export</td>
+    <td>❌</td>
+    <td>✅</td>
+  </tr>
+  <tr>
+    <td>Session verwenden/speichern</td>
+    <td>❌</td>
+    <td>✅</td>
+  </tr>
+  <tr>
+    <td>Dateigröße</td>
+    <td>~3KB</td>
+    <td>~15KB</td>
+  </tr>
+</table>
+
+---
+
+## 🚀 Tipps & Tricks
+
+### Browser automatisch öffnen
+Die App öffnet sich schon automatisch. Falls nicht:
+```
+http://localhost:8501
+```
+
+### Mehrere Fenster gleichzeitig
+Wenn Sie Ihre Excel beim Einkaufen und Streamlit gleichzeitig nutzen wollen:
+```powershell
+# Terminal 1:
+streamlit run streamlit_app_advanced.py
+
+# Terminal 2 (oder neues PowerShell Fenster):
+cd c:\Development\Sonstiges\suku-programm
+# Excel öffnen
+start Ihre_Datei.xlsx
+```
+
+### Schneller Wechsel zur Desktop-Version
+Falls Sie doch lieber bei der Tkinter GUI bleiben:
+```powershell
+python src/main.py
+```
+
+### Port ändern (falls 8501 belegt)
+```powershell
+streamlit run streamlit_app_advanced.py --server.port 8502
+```
+
+---
+
+---
+
+## 🛠️ Troubleshooting
+
+**"ModuleNotFoundError"?**
+```powershell
+pip install -r requirements-streamlit.txt --force-reinstall
+```
+
+**"Port 8501 is already in use"?**
+- Alte Streamlit-Prozesse killen:
+```powershell
+Get-Process python | Where-Object {$_.CommandLine -like "*streamlit*"} | Stop-Process -Force
+```
+
+**App sehr langsam?**
+- Cache leeren: Ctrl+F5 im Browser
+- Oder neuen Port nutzen: `streamlit run streamlit_app_advanced.py --server.port 8502`
+
+---
+
+## 💡 Nächste Schritte (Optional)
+
+1. **PDF-Generierung beschleunigen**: Caching einbauen
+2. **Persistente Speicherung**: JSON-Dateien speichern statt nur Session-State
+3. **Multiuser**: Mit Streamlit Cloud deployen (kostenlos!)
+4. **Mobile Optimierung**: Responsives Design verfeinern
+
+---
+
+Debugging via `streamlit run streamlit_app_advanced.py --logger.level=debug`
