@@ -5,3 +5,10 @@ src/__pycache__/*
 /src/build/*
 /src/dist/*
 /src/models/__pycache__/** 
+
+# Streamlit Secrets (enthält sensible DB-Credentials!)
+.streamlit/secrets.toml
+
+# Lokale Speichern
+.suku_planung/
+*.json 

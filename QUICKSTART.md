@@ -14,6 +14,18 @@ cd c:\Development\Sonstiges\suku-programm
 pip install -r requirements-streamlit.txt
 ```
 
+### 2b️⃣ (Optional) Neon Database konfigurieren
+
+Damit Ihre Daten auch bei App-Neustart erhalten bleiben (empfohlen!):
+
+```powershell
+# 1. Öffnen Sie .streamlit/secrets.toml
+# 2. Setzen Sie DATABASE_URL (siehe NEON_SETUP.md für Anleitung)
+# 3. Speichern und neustarten
+```
+
+Detaillierte Anleitung: [NEON_SETUP.md](NEON_SETUP.md)
+
 ### 3️⃣ App starten - Wählen Sie eine Version:
 
 **OPTION A: Basis-Version (empfohlen für Anfänger)**
@@ -94,9 +106,14 @@ streamlit run streamlit_app_advanced.py
     <td>✅ Auto-Laden + Manuelles Speichern</td>
   </tr>
   <tr>
+    <td>Cloud Datenbank (Neon)</td>
+    <td>❌</td>
+    <td>✅ Mit PostgreSQL Backup!</td>
+  </tr>
+  <tr>
     <td>Dateigröße</td>
     <td>~3KB</td>
-    <td>~20KB</td>
+    <td>~25KB (mit DB)</td>
   </tr>
 </table>
 

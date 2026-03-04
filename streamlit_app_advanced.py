@@ -23,10 +23,16 @@ from src.Lieferantenliste import Lieferantenliste
 from src.Excel import Excel
 from src.config import workbooks_default, laden_default, lieferanten_default
 from src.models.Laden import Laden
+from src.neon_database import get_neon_db
+
 
 # ============= PERSISTENT STORAGE FUNKTIONEN =============
 SAVE_DIR = Path.home() / ".suku_planung"
 SAVE_DIR.mkdir(exist_ok=True)
+
+# Optional: Umgebungsvariable laden
+from dotenv import load_dotenv
+load_dotenv()
 
 def get_save_file_path(filename: str) -> Path:
     """Gibt den Pfad für persistente Speicherung zurück"""
@@ -88,6 +94,15 @@ def restore_dict_from_string_keys(d: dict) -> dict:
             result[restored_key] = value
     return result
 
+# Lokale Persistierungs-Funktion (Fallback)
+@st.cache_resource
+def load_persisted_state():
+    """Lädt lokal gespeicherte Änderungen"""
+    state = load_session_state("einkaufslisten_changes.json")
+    if state:
+        return restore_dict_from_string_keys(state)
+    return {}
+
 # Streamlit Page Configuration
 st.set_page_config(
     page_title="Zeltlager SUKU Planung ADVANCED",
@@ -122,26 +137,74 @@ if "tage" not in st.session_state:
 if "einkaufslisten_dict" not in st.session_state:
     st.session_state.einkaufslisten_dict = {}
 if "artikel_modifikationen" not in st.session_state:
-    st.session_state.artikel_modifikationen = {}  # {artikel_key: neuer_laden}
+    st.session_state.artikel_modifikationen = {}
 if "neue_artikel" not in st.session_state:
     st.session_state.neue_artikel = []
 if "abgehakte_artikel" not in st.session_state:
-    st.session_state.abgehakte_artikel = {}  # {laden: [artikel_keys]}
+    st.session_state.abgehakte_artikel = {}
 if "last_save_time" not in st.session_state:
     st.session_state.last_save_time = None
+if "session_id" not in st.session_state:
+    # Generiere eindeutige Session-ID
+    import uuid
+    st.session_state.session_id = f"session_{uuid.uuid4().hex[:12]}"
+if "use_neon_db" not in st.session_state:
+    st.session_state.use_neon_db = False
+if "neon_connected" not in st.session_state:
+    st.session_state.neon_connected = False
 
-# Persistierte Änderungen beim Start laden
+# Versuche Neon DB zu verbinden
 @st.cache_resource
-def load_persisted_state():
-    state = load_session_state("einkaufslisten_changes.json")
-    if state:
-        return restore_dict_from_string_keys(state)
-    return {}
+def init_neon_db():
+    try:
+        db = get_neon_db()
+        if db:
+            status = db.get_db_status()
+            if status['connected']:
+                return db, True, None
+    except ConnectionError as ce:
+        return None, False, str(ce)
+    except Exception as e:
+        return None, False, f"Fehler: {str(e)}"
+    return None, False, None
 
-persisted_changes = load_persisted_state()
-if persisted_changes and "abgehakte_artikel" in persisted_changes:
-    st.session_state.abgehakte_artikel = persisted_changes.get("abgehakte_artikel", {})
-    st.session_state.artikel_modifikationen = persisted_changes.get("artikel_modifikationen", {})
+neon_db, db_connected, db_error = init_neon_db()
+
+# Zeige DB-Fehler am Anfang wenn vorhanden
+if db_error:
+    with st.sidebar:
+        st.error("❌ Datenbankverbindung fehlgeschlagen")
+        with st.expander("📋 Details & Lösung"):
+            st.write(db_error)
+            st.info(
+                "**Schnelle Lösung:**\n\n"
+                "1. Öffnen Sie https://console.neon.tech/\n"
+                "2. Wählen Sie Ihr Projekt und die Datenbank\n"
+                "3. Kopieren Sie die Connection String\n"
+                "4. Bearbeiten Sie `.streamlit/secrets.toml`\n"
+                "5. Neustart: Ctrl+R im Browser"
+            )
+
+if neon_db:
+    st.session_state.neon_connected = True
+    st.session_state.use_neon_db = True
+    
+    # Lade Änderungen aus Neon DB beim Start
+    try:
+        saved_data = neon_db.load_session(st.session_state.session_id)
+        if saved_data:
+            st.session_state.abgehakte_artikel = saved_data.get("abgehakte_artikel", {})
+            st.session_state.artikel_modifikationen = saved_data.get("artikel_modifikationen", {})
+            st.session_state.neue_artikel = saved_data.get("neue_artikel", [])
+    except Exception as e:
+        st.warning(f"⚠️ Konnte Daten nicht von Neon laden, nutze lokal gespeicherte: {str(e)}")
+else:
+    # Fallback zu lokal gespeicherten Daten
+    persisted_changes = load_persisted_state()
+    if persisted_changes and "abgehakte_artikel" in persisted_changes:
+        st.session_state.abgehakte_artikel = persisted_changes.get("abgehakte_artikel", {})
+        st.session_state.artikel_modifikationen = persisted_changes.get("artikel_modifikationen", {})
+
 
 
 # ============= SIDEBAR KONFIGURATION =============
@@ -401,7 +464,7 @@ else:
                             })
                         
                         if zutat_data:
-                            st.dataframe(zutat_data, use_container_width=True, hide_index=True)
+                            st.dataframe(zutat_data, width='stretch', hide_index=True)
                         else:
                             st.info("Keine Zutaten")
     
@@ -429,7 +492,7 @@ else:
                                     "Kategorie": zutat_info.get("kategorie", "")
                                 })
                             
-                            st.dataframe(lieferant_data, use_container_width=True, hide_index=True)
+                            st.dataframe(lieferant_data, width='stretch', hide_index=True)
                         else:
                             st.info("Keine Artikel")
             except Exception as e:
@@ -543,9 +606,27 @@ else:
                     "neue_artikel": st.session_state.neue_artikel,
                     "save_time": datetime.now().isoformat()
                 }
+                
+                success = False
+                
+                # Versuche zuerst in Neon DB zu speichern
+                if st.session_state.use_neon_db and neon_db:
+                    try:
+                        week_name = "_".join(läden_list[:2])  # Kurzer Name für die Woche
+                        success = neon_db.save_session(st.session_state.session_id, week_name, save_data)
+                    except Exception as e:
+                        st.warning(f"⚠️ Neon DB Fehler: {str(e)}")
+                
+                # Fallback: Auch lokal speichern
                 if save_session_state("einkaufslisten_changes.json", convert_dict_keys_to_string(save_data)):
+                    success = True
+                
+                if success:
                     st.session_state.last_save_time = datetime.now()
-                    st.success(f"✅ Änderungen gespeichert um {datetime.now().strftime('%H:%M:%S')}")
+                    if st.session_state.use_neon_db:
+                        st.success(f"✅ In Neon DB gespeichert um {datetime.now().strftime('%H:%M:%S')}")
+                    else:
+                        st.success(f"✅ Lokal gespeichert um {datetime.now().strftime('%H:%M:%S')}")
                 else:
                     st.error("❌ Fehler beim Speichern")
         
@@ -585,21 +666,55 @@ else:
                     st.error(f"Fehler beim Importieren: {str(e)}")
         
         st.divider()
+        st.subheader("�️ Datenbank Status")
+        
+        if st.session_state.use_supabase_db and supabase_db:
+            st.success("✅ Supabase PostgreSQL Datenbank verbunden")
+            db_status = supabase_db.get_db_status()
+            
+            col_db1, col_db2 = st.columns(2)
+            with col_db1:
+                st.metric("Gespeicherte Sessions", db_status['session_count'])
+            with col_db2:
+                st.metric("Session ID", st.session_state.session_id[:12])
+            
+            # Liste gespeicherte Sessions
+            with st.expander("📋 Alle gespeicherten Sessions"):
+                sessions = supabase_db.list_sessions()
+                if sessions:
+                    for sess in sessions:
+                        col_info1, col_info2, col_info3 = st.columns([2, 2, 1])
+                        with col_info1:
+                            st.write(f"**{sess['week_name']}**")
+                        with col_info2:
+                            st.caption(sess['updated_at'][:19] if sess['updated_at'] else 'N/A')
+                        with col_info3:
+                            if st.button(f"🗑️ Löschen", key=f"del_{sess['session_id']}"):
+                                if supabase_db.delete_session(sess['session_id']):
+                                    st.success("Gelöscht!")
+                                    st.rerun()
+                else:
+                    st.info("Keine Sessions gespeichert")
+        else:
+            st.warning("⚠️ Supabase Datenbank nicht verbunden - nur lokale Speicherung aktiv")
+            st.info("📌 Konfigurieren Sie DATABASE_URL in `.streamlit/secrets.toml`")
+        
+        st.divider()
         st.subheader("📋 Session Informationen")
         
         info_data = {
             "Datum/Zeit": datetime.now().isoformat(),
-            "Wochentage": len(st.session_state.tage) if st.session_state.tage else 0,
-            "Läden": len(läden_list),
-            "Artikel gesamt": sum(len(items) for items in st.session_state.einkaufslisten_dict.values()),
-            "Geänderte Artikel": len(st.session_state.artikel_modifikationen),
-            "Abgehakte Artikel": sum(len(items) for items in st.session_state.abgehakte_artikel.values()),
+            "Wochentage": str(len(st.session_state.tage) if st.session_state.tage else 0),
+            "Läden": str(len(läden_list)),
+            "Artikel gesamt": str(sum(len(items) for items in st.session_state.einkaufslisten_dict.values())),
+            "Geänderte Artikel": str(len(st.session_state.artikel_modifikationen)),
+            "Abgehakte Artikel": str(sum(len(items) for items in st.session_state.abgehakte_artikel.values())),
             "Letzte Speicherung": st.session_state.last_save_time.strftime('%H:%M:%S') if st.session_state.last_save_time else "Noch nicht gespeichert",
-            "Speicherordner": str(SAVE_DIR)
+            "Speicherort": "Supabase DB + Lokal" if st.session_state.use_supabase_db else "Lokal"
         }
         
         df_info = pd.DataFrame(list(info_data.items()), columns=["Eigenschaft", "Wert"])
-        st.dataframe(df_info, use_container_width=True, hide_index=True)
+        st.dataframe(df_info, width='stretch', hide_index=True)
         
         st.divider()
         st.subheader("🔧 Debug Info")
