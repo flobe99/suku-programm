@@ -24,6 +24,70 @@ from src.Excel import Excel
 from src.config import workbooks_default, laden_default, lieferanten_default
 from src.models.Laden import Laden
 
+# ============= PERSISTENT STORAGE FUNKTIONEN =============
+SAVE_DIR = Path.home() / ".suku_planung"
+SAVE_DIR.mkdir(exist_ok=True)
+
+def get_save_file_path(filename: str) -> Path:
+    """Gibt den Pfad für persistente Speicherung zurück"""
+    return SAVE_DIR / filename
+
+def save_session_state(filename: str, data: dict) -> bool:
+    """Speichert Session-State in JSON-Datei"""
+    try:
+        save_path = get_save_file_path(filename)
+        with open(save_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False, default=str)
+        return True
+    except Exception as e:
+        st.error(f"Fehler beim Speichern: {str(e)}")
+        return False
+
+def load_session_state(filename: str) -> dict:
+    """Lädt Session-State aus JSON-Datei"""
+    try:
+        save_path = get_save_file_path(filename)
+        if save_path.exists():
+            with open(save_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        st.warning(f"Fehler beim Laden: {str(e)}")
+    return {}
+
+def convert_dict_keys_to_string(d: dict) -> dict:
+    """Konvertiert dict-Keys zu Strings für JSON-Serialisierung"""
+    result = {}
+    for key, value in d.items():
+        if isinstance(key, tuple):
+            str_key = str(key)
+        else:
+            str_key = str(key)
+        
+        if isinstance(value, dict):
+            result[str_key] = convert_dict_keys_to_string(value)
+        else:
+            result[str_key] = value
+    return result
+
+def restore_dict_from_string_keys(d: dict) -> dict:
+    """Versucht String-Keys zurück zu Tuples zu konvertieren"""
+    result = {}
+    for key, value in d.items():
+        try:
+            # Versuche Key als Tuple zu interpretieren
+            if key.startswith("(") and key.endswith(")"):
+                restored_key = eval(key)
+            else:
+                restored_key = key
+        except:
+            restored_key = key
+        
+        if isinstance(value, dict):
+            result[restored_key] = restore_dict_from_string_keys(value)
+        else:
+            result[restored_key] = value
+    return result
+
 # Streamlit Page Configuration
 st.set_page_config(
     page_title="Zeltlager SUKU Planung ADVANCED",
@@ -63,6 +127,22 @@ if "neue_artikel" not in st.session_state:
     st.session_state.neue_artikel = []
 if "abgehakte_artikel" not in st.session_state:
     st.session_state.abgehakte_artikel = {}  # {laden: [artikel_keys]}
+if "last_save_time" not in st.session_state:
+    st.session_state.last_save_time = None
+
+# Persistierte Änderungen beim Start laden
+@st.cache_resource
+def load_persisted_state():
+    state = load_session_state("einkaufslisten_changes.json")
+    if state:
+        return restore_dict_from_string_keys(state)
+    return {}
+
+persisted_changes = load_persisted_state()
+if persisted_changes and "abgehakte_artikel" in persisted_changes:
+    st.session_state.abgehakte_artikel = persisted_changes.get("abgehakte_artikel", {})
+    st.session_state.artikel_modifikationen = persisted_changes.get("artikel_modifikationen", {})
+
 
 # ============= SIDEBAR KONFIGURATION =============
 with st.sidebar:
@@ -441,7 +521,7 @@ else:
         
         st.subheader("💾 Session Verwaltung")
         
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         
         with col1:
             if st.button("🔄 Neuladen", use_container_width=True):
@@ -455,6 +535,55 @@ else:
                 st.success("✅ Zurückgesetzt!")
                 st.rerun()
         
+        with col3:
+            if st.button("💾 Änderungen speichern", use_container_width=True):
+                save_data = {
+                    "abgehakte_artikel": st.session_state.abgehakte_artikel,
+                    "artikel_modifikationen": st.session_state.artikel_modifikationen,
+                    "neue_artikel": st.session_state.neue_artikel,
+                    "save_time": datetime.now().isoformat()
+                }
+                if save_session_state("einkaufslisten_changes.json", convert_dict_keys_to_string(save_data)):
+                    st.session_state.last_save_time = datetime.now()
+                    st.success(f"✅ Änderungen gespeichert um {datetime.now().strftime('%H:%M:%S')}")
+                else:
+                    st.error("❌ Fehler beim Speichern")
+        
+        st.divider()
+        st.subheader("📥 Import/Export von Änderungen")
+        
+        col_export1, col_export2 = st.columns(2)
+        
+        with col_export1:
+            if st.button("📤 Änderungen exportieren (JSON)", use_container_width=True):
+                export_data = {
+                    "abgehakte_artikel": st.session_state.abgehakte_artikel,
+                    "artikel_modifikationen": st.session_state.artikel_modifikationen,
+                    "neue_artikel": st.session_state.neue_artikel,
+                    "export_time": datetime.now().isoformat()
+                }
+                json_str = json.dumps(export_data, indent=2, ensure_ascii=False, default=str)
+                st.download_button(
+                    label="⬇️ JSON exportieren",
+                    data=json_str,
+                    file_name=f"Aenderungen_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                    mime="application/json",
+                    use_container_width=True
+                )
+        
+        with col_export2:
+            backup_file = st.file_uploader("📥 Änderungen importieren (JSON)", type=["json"], key="import_changes")
+            if backup_file is not None:
+                try:
+                    imported_data = json.load(backup_file)
+                    st.session_state.abgehakte_artikel = imported_data.get("abgehakte_artikel", {})
+                    st.session_state.artikel_modifikationen = imported_data.get("artikel_modifikationen", {})
+                    st.session_state.neue_artikel = imported_data.get("neue_artikel", [])
+                    st.success(f"✅ Änderungen importiert! ({imported_data.get('export_time', 'N/A')})")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Fehler beim Importieren: {str(e)}")
+        
         st.divider()
         st.subheader("📋 Session Informationen")
         
@@ -464,7 +593,9 @@ else:
             "Läden": len(läden_list),
             "Artikel gesamt": sum(len(items) for items in st.session_state.einkaufslisten_dict.values()),
             "Geänderte Artikel": len(st.session_state.artikel_modifikationen),
-            "Abgehakte Artikel": sum(len(items) for items in st.session_state.abgehakte_artikel.values())
+            "Abgehakte Artikel": sum(len(items) for items in st.session_state.abgehakte_artikel.values()),
+            "Letzte Speicherung": st.session_state.last_save_time.strftime('%H:%M:%S') if st.session_state.last_save_time else "Noch nicht gespeichert",
+            "Speicherordner": str(SAVE_DIR)
         }
         
         df_info = pd.DataFrame(list(info_data.items()), columns=["Eigenschaft", "Wert"])

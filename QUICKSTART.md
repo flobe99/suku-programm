@@ -71,7 +71,7 @@ streamlit run streamlit_app_advanced.py
   <tr>
     <td>Zwischen Läden verschieben</td>
     <td>❌</td>
-    <td>✅</td>
+    <td>✅ Auch zwischen Lieferanten!</td>
   </tr>
   <tr>
     <td>Spontan Artikel hinzufügen</td>
@@ -86,12 +86,17 @@ streamlit run streamlit_app_advanced.py
   <tr>
     <td>Session verwenden/speichern</td>
     <td>❌</td>
-    <td>✅</td>
+    <td>✅ Mit JSON-Persistierung!</td>
+  </tr>
+  <tr>
+    <td>Änderungen zwischen Sessions erhalten</td>
+    <td>❌</td>
+    <td>✅ Auto-Laden + Manuelles Speichern</td>
   </tr>
   <tr>
     <td>Dateigröße</td>
     <td>~3KB</td>
-    <td>~15KB</td>
+    <td>~20KB</td>
   </tr>
 </table>
 
@@ -130,6 +135,38 @@ streamlit run streamlit_app_advanced.py --server.port 8502
 
 ---
 
+## 💾 Persistierung & Speichern (Advanced Version)
+
+### Automatisches Laden beim Start
+Ihre Änderungen werden automatisch geladen, wenn Sie die App neu starten:
+- ✅ Abhakemarken bleiben erhalten
+- ✅ Verschobene Artikel bleiben an ihrem neuen Ort
+- ✅ Neue Artikel, die Sie hinzugefügt haben, sind noch da
+
+**Speicherort:** `%USERPROFILE%\.suku_planung\einkaufslisten_changes.json`
+
+### Manuell Speichern (empfohlen nach Einkauf)
+1. Gehen Sie zu Tab "⚡ Einstellungen"
+2. Klicken Sie auf "💾 Änderungen speichern"
+3. Status zeigt die Uhrzeit der letzten Speicherung
+
+### Änderungen Exportieren/Importieren
+**Exportieren** (mit anderen teilen oder archivieren):
+- Tab "⚡ Einstellungen"
+- Button "📤 Änderungen exportieren (JSON)"
+- JSON-Datei wird heruntergeladen
+
+**Importieren** (von gespeicherten Änderungen):
+- Tab "⚡ Einstellungen"
+- Upload-Button "📥 Änderungen importieren (JSON)"
+- Wählen Sie eine vorher exportierte JSON-Datei
+- Änderungen werden geladen!
+
+### Szenario: Einkauf unterbrechen & fortsetzen
+1. **Einkauf starten:** App laden → Excel hochladen → einkaufen anfangen
+2. **Unterbruch:** Abhacken "💾 Änderungen speichern" → App schließen
+3. **Später fortsetzen:** App erneut starten → Excel laden → Ihre Änderungen sind da! ✅
+
 ---
 
 ## 🛠️ Troubleshooting
@@ -154,9 +191,31 @@ Get-Process python | Where-Object {$_.CommandLine -like "*streamlit*"} | Stop-Pr
 ## 💡 Nächste Schritte (Optional)
 
 1. **PDF-Generierung beschleunigen**: Caching einbauen
-2. **Persistente Speicherung**: JSON-Dateien speichern statt nur Session-State
+2. ✅ **Persistente Speicherung**: JSON-Dateien speichern statt nur Session-State (BEREITS IMPLEMENTIERT!)
 3. **Multiuser**: Mit Streamlit Cloud deployen (kostenlos!)
 4. **Mobile Optimierung**: Responsives Design verfeinern
+
+---
+
+## ❓ FAQ
+
+**F: Warum ist die App schneller zu entwickeln als die Tkinter GUI?**
+A: Streamlit abstrahiert viele UI-Tasks automatisch. Keine komplexen Layout-Manager nötig.
+
+**F: Kann ich die App auch auf meinem Handy nutzen?**
+A: Ja, wenn Sie einen kleinen Server daneben laufen lassen. Vorerst: Lokal am Laptop.
+
+**F: Werden meine Änderungen beim Einkaufen gespeichert?**
+A: Ja! Automatisch im Speicherordner. Mit "💾 Änderungen speichern" auch manuell verfügbar. Nach `Ctrl+C` oder Browser-Refresh gehen sie NICHT verloren - beim nächsten App-Start sind sie automatisch da! ✅
+
+**F: Wo werden meine Daten gespeichert?**
+A: In `%USERPROFILE%\.suku_planung\einkaufslisten_changes.json` (Ihr Windows Home-Verzeichnis)
+
+**F: Kann ich Änderungen mit anderen teilen?**
+A: Ja! Button "📤 Änderungen exportieren (JSON)" und danach versenden oder auf USB-Stick kopieren. Andere können diese dann mit "📥 Änderungen importieren" laden.
+
+**F: Kann ich beides (Tkinter + Streamlit) gleichzeitig nutzen?**
+A: Sicher! Tkinter und Streamlit sind unabhängig.
 
 ---
 
