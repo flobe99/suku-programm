@@ -1,0 +1,30 @@
+ich möchte eine Essenskalkulation mit python streamlit machen. Die Kalkulation soll folgendese können
+
+Die Essenskalkulation besteht aus mehreren Tagen.
+Jeder Tag besteht aus mehreren Gerichten
+
+Gerichte bestehen aus Gerichtname, Uhrzeit und Mahlzeit
+Jedes Gericht besteht aus mehreren zutaten
+ein Gericht kann aus mehreren Beilagen bestehen
+Zu einer Beilage können mehrere Zutaten gehören
+Jede Zutat besteht aus einer Artikelname, Menge, Einheit, Kategorie, sonstiges, Lieferant und Tag
+Die Einheit soll aus einer vordefinierten Liste ausgewählt werden können (z.B. kg, Stk, L, ml, Pack, Becher, Dose, Bund)
+Die Kategorie soll aus einer vordefinierten Liste ausgewählt werden können (z.B. Gemüse, Obst, Fleisch, Milchprodukte, Sonstiges)
+Sonstiges ist ein Freitextfeld für zusätzliche Informationen
+Lieferant soll aus einer vordefinierten Liste ausgewählt werden können (z.B. Rewe, Edeka, Lidl, Aldi, Metro, Lieferando)
+
+Es sollen mehrere Lieferanten möglich sein
+Ein Lieferant kann aus einem Laden oder ein Lieferant bestehen
+Zu jedem Laden soll eine summierte Einkaufsliste erstellt werden, die alle Zutaten enthält, die von diesem Laden geliefert werden sollen
+Die Einkaufsliste soll die Artikelname, Menge, Einheit, Kategorie, sonstiges enthalten
+Der Lieferant soll eine List pro Tag erhalten, die alle Zutaten enthält, die von diesem Lieferanten geliefert werden sollen
+
+Zusätzlich soll es in der Essenskalkulation die Möglichkeit haben, allgemein nicht Tage bezogene Kalkulationen vorzunehmen
+
+Am Ende soll die Kalkulation, die Einkaufsliste und die Lieferantenliste als PDF exportiert werden können
+Es sollen sowohl einzelen Tage wie auch die gesamte Kalkulation exportiert werden können
+Es sollen einzelne Einkaufsliste pro Laden exportiert werden können
+Es sollen einzelne Lieferantenlisten pro Tag exportiert werden können
+
+Kann ich das mit python streamlit und einer Datenbank umsetzen? Wenn ja, wie könnte die Datenbankstruktur aussehen?
+Es soll später die Möglichkeit haben, mehere User und mehrere Kalkulationen also Projekte zu verwalten.

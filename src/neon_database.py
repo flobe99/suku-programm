@@ -1,181 +1,173 @@
 """
-Neon Database Integration für Zeltlager SUKU Planung
+Neon Database Integration mit Data API (HTTP REST)
 Speichert alle Änderungen in einer PostgreSQL Datenbank (gehostet auf Neon)
+Verwendet HTTP REST API statt direkter PostgreSQL Verbindung
 """
 
 import os
 import json
+import requests
 from datetime import datetime
 from typing import Dict, List, Optional
 import streamlit as st
 
-try:
-    from sqlalchemy import create_engine, Column, String, Integer, DateTime, Text, JSON
-    from sqlalchemy.ext.declarative import declarative_base
-    from sqlalchemy.orm import sessionmaker
-    SQLALCHEMY_AVAILABLE = True
-except ImportError:
-    SQLALCHEMY_AVAILABLE = False
 
-# Database Configuration
-Base = declarative_base()
-
-class ShoppingSession(Base):
-    """Model für Einkaufssessions"""
-    __tablename__ = 'shopping_sessions'
+class NeonDatabaseConnection:
+    """Streamlit Connection für Neon Data API"""
     
-    id = Column(Integer, primary_key=True)
-    session_id = Column(String(50), unique=True, nullable=False)
-    week_name = Column(String(100), nullable=False)
-    checked_items = Column(JSON, default={})
-    modified_items = Column(JSON, default={})
-    new_items = Column(JSON, default={})
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'session_id': self.session_id,
-            'week_name': self.week_name,
-            'checked_items': self.checked_items or {},
-            'modified_items': self.modified_items or {},
-            'new_items': self.new_items or {},
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+    def __init__(self, api_url: str, api_key: str):
+        """Initialize the Data API connection"""
+        self.api_url = api_url.rstrip('/')
+        self.api_key = api_key
+        self.headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
         }
-
-class NeonDatabase:
-    """Wrapper für Neon Database Operationen"""
-    
-    def __init__(self, database_url: Optional[str] = None):
-        """Initialize the database connection"""
-        if not SQLALCHEMY_AVAILABLE:
-            raise ImportError("SQLAlchemy nicht installiert. Führen Sie aus: pip install -r requirements-streamlit.txt")
         
-        # Database URL aus Environment oder Parameter
-        self.database_url = database_url or os.getenv('DATABASE_URL')
-        
-        if not self.database_url:
-            raise ValueError(
-                "DATABASE_URL nicht gesetzt! Setzen Sie die Umgebungsvariable oder übergeben Sie die URL.\n"
-                "Beispiel: DATABASE_URL=postgresql://user:password@host/dbname"
-            )
-        
-        # Konvertiere postgres:// zu postgresql:// für neuere SQLAlchemy Versionen
-        if self.database_url.startswith('postgres://'):
-            self.database_url = self.database_url.replace('postgres://', 'postgresql://', 1)
-        
-        # Entferne problematische Parameter
-        # if 'channel_binding=require' in self.database_url:
-        #     self.database_url = self.database_url.replace('&channel_binding=require', '')
-        #     self.database_url = self.database_url.replace('?channel_binding=require', '?sslmode=require')
-        
+        # Test connection
         try:
-            # Verwende connection pool mit besseren Settings
-            from sqlalchemy.pool import QueuePool
-            self.engine = create_engine(
-                self.database_url,
-                echo=False,
-                poolclass=QueuePool,
-                pool_size=5,
-                max_overflow=10,
-                pool_pre_ping=True,
-                pool_recycle=3600
-            )
-            self.Session = sessionmaker(bind=self.engine)
-            
-            # Test connection
-            with self.engine.connect() as conn:
-                conn.execute("SELECT 1")
-            
-            # Erstelle Tabellen falls nicht vorhanden
-            Base.metadata.create_all(self.engine)
+            self._test_connection()
         except Exception as e:
-            error_msg = str(e)
-            
-            # Hilfreiche Fehlerdiagnose
-            diagnostics = []
-            
-            if "does not exist" in error_msg:
-                diagnostics.append("🔴 Datenbank existiert nicht - überprüfen Sie den DB-Namen")
-            
-            if "invalid password" in error_msg.lower() or "authentication failed" in error_msg.lower():
-                diagnostics.append("🔴 Passwort ungültig - überprüfen Sie Credentials in der Neon-Konsole")
-            
-            raise ConnectionError(
-                f"❌ Fehler beim Verbinden zur Neon Datenbank:\n\n"
-                f"**Fehler:** {error_msg}\n\n"
-                f"**Diagnostik:**\n" + 
-                "\n".join("• " + d for d in diagnostics) if diagnostics else "• Unbekannter Fehler" +
-                "\n\n**Lösung:**\n"
-                "1. Öffnen Sie https://console.neon.tech/\n"
-                "2. Wählen Sie Ihr Projekt und die Datenbank\n"
-                "3. Kopieren Sie die Connection String\n"
-                "4. Fügen Sie sie in `.streamlit/secrets.toml` als DATABASE_URL ein\n"
-                "5. Starten Sie die App neu"
+            raise ConnectionError(f"❌ Neon Data API Verbindung fehlgeschlagen: {str(e)}")
+    
+    def _test_connection(self):
+        """Test the connection to Data API"""
+        try:
+            # Versuche, die Tabelle zu beschreiben
+            response = requests.get(
+                f"{self.api_url}/tables/shopping_sessions",
+                headers=self.headers,
+                timeout=5
             )
+            if response.status_code not in [200, 400]:  # 400 könnte bedeuten: Tabelle existiert nicht
+                raise Exception(f"Status Code: {response.status_code}")
+        except Exception as e:
+            raise ConnectionError(f"Data API nicht erreichbar: {str(e)}")
     
     def save_session(self, session_id: str, week_name: str, data: Dict) -> bool:
         """Speichert oder aktualisiert eine Shopping-Session"""
         try:
-            session = self.Session()
+            payload = {
+                "session_id": session_id,
+                "week_name": week_name,
+                "checked_items": json.dumps(data.get('abgehakte_artikel', {})),
+                "modified_items": json.dumps(data.get('artikel_modifikationen', {})),
+                "new_items": json.dumps(data.get('neue_artikel', [])),
+                "updated_at": datetime.now().isoformat()
+            }
             
-            # Suche existierende Session
-            existing = session.query(ShoppingSession).filter_by(session_id=session_id).first()
+            # Überprüfe zuerst, ob die Session existiert
+            existing = self._get_raw_session(session_id)
             
             if existing:
-                # Update
-                existing.week_name = week_name
-                existing.checked_items = data.get('abgehakte_artikel', {})
-                existing.modified_items = data.get('artikel_modifikationen', {})
-                existing.new_items = data.get('neue_artikel', [])
-                existing.updated_at = datetime.now()
-            else:
-                # Create new
-                new_session = ShoppingSession(
-                    session_id=session_id,
-                    week_name=week_name,
-                    checked_items=data.get('abgehakte_artikel', {}),
-                    modified_items=data.get('artikel_modifikationen', {}),
-                    new_items=data.get('neue_artikel', [])
-                )
-                session.add(new_session)
+                # Update: DELETE alte + INSERT neue
+                self._delete_raw_session(session_id)
             
-            session.commit()
-            session.close()
-            return True
+            # Insert neue Session
+            response = requests.post(
+                f"{self.api_url}/tables/shopping_sessions/rows",
+                headers=self.headers,
+                json=payload,
+                timeout=10
+            )
+            
+            if response.status_code in [200, 201]:
+                return True
+            else:
+                error_msg = response.text if response.text else f"Status {response.status_code}"
+                st.error(f"API Fehler beim Speichern: {error_msg}")
+                return False
+                
         except Exception as e:
-            st.error(f"Datenbankfehler beim Speichern: {str(e)}")
+            st.error(f"Fehler beim Speichern der Session: {str(e)}")
             return False
     
     def load_session(self, session_id: str) -> Optional[Dict]:
         """Lädt eine Shopping-Session aus der Datenbank"""
         try:
-            session = self.Session()
-            shopping_session = session.query(ShoppingSession).filter_by(session_id=session_id).first()
-            session.close()
+            raw_data = self._get_raw_session(session_id)
             
-            if shopping_session:
+            if raw_data:
+                # Parse JSON fields
                 return {
-                    'abgehakte_artikel': shopping_session.checked_items or {},
-                    'artikel_modifikationen': shopping_session.modified_items or {},
-                    'neue_artikel': shopping_session.new_items or [],
-                    'updated_at': shopping_session.updated_at.isoformat() if shopping_session.updated_at else None
+                    'abgehakte_artikel': json.loads(raw_data.get('checked_items', '{}')),
+                    'artikel_modifikationen': json.loads(raw_data.get('modified_items', '{}')),
+                    'neue_artikel': json.loads(raw_data.get('new_items', '[]')),
+                    'updated_at': raw_data.get('updated_at')
                 }
         except Exception as e:
             st.warning(f"Fehler beim Laden aus Datenbank: {str(e)}")
         
         return None
     
+    def _get_raw_session(self, session_id: str) -> Optional[Dict]:
+        """Lädt raw Session-Daten (intern)"""
+        try:
+            params = {
+                "session_id": f"eq.{session_id}"
+            }
+            
+            response = requests.get(
+                f"{self.api_url}/tables/shopping_sessions/rows",
+                headers=self.headers,
+                params=params,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list) and len(data) > 0:
+                    return data[0]
+            
+            return None
+        except Exception as e:
+            st.warning(f"Fehler beim Abrufen der Session: {str(e)}")
+            return None
+    
+    def _delete_raw_session(self, session_id: str) -> bool:
+        """Löscht eine raw Session (intern)"""
+        try:
+            params = {
+                "session_id": f"eq.{session_id}"
+            }
+            
+            response = requests.delete(
+                f"{self.api_url}/tables/shopping_sessions/rows",
+                headers=self.headers,
+                params=params,
+                timeout=10
+            )
+            
+            return response.status_code in [200, 204]
+        except Exception as e:
+            return False
+    
     def list_sessions(self) -> List[Dict]:
         """Listet alle Shopping-Sessions auf"""
         try:
-            session = self.Session()
-            sessions = session.query(ShoppingSession).all()
-            session.close()
+            response = requests.get(
+                f"{self.api_url}/tables/shopping_sessions/rows",
+                headers=self.headers,
+                timeout=10
+            )
             
-            return [s.to_dict() for s in sessions]
+            if response.status_code == 200:
+                sessions = response.json()
+                if isinstance(sessions, list):
+                    result = []
+                    for s in sessions:
+                        result.append({
+                            'id': s.get('id'),
+                            'session_id': s.get('session_id'),
+                            'week_name': s.get('week_name'),
+                            'checked_items': json.loads(s.get('checked_items', '{}')),
+                            'modified_items': json.loads(s.get('modified_items', '{}')),
+                            'new_items': json.loads(s.get('new_items', '[]')),
+                            'created_at': s.get('created_at'),
+                            'updated_at': s.get('updated_at')
+                        })
+                    return result
+            return []
         except Exception as e:
             st.warning(f"Fehler beim Auflisten der Sessions: {str(e)}")
             return []
@@ -183,11 +175,22 @@ class NeonDatabase:
     def delete_session(self, session_id: str) -> bool:
         """Löscht eine Shopping-Session"""
         try:
-            session = self.Session()
-            session.query(ShoppingSession).filter_by(session_id=session_id).delete()
-            session.commit()
-            session.close()
-            return True
+            params = {
+                "session_id": f"eq.{session_id}"
+            }
+            
+            response = requests.delete(
+                f"{self.api_url}/tables/shopping_sessions/rows",
+                headers=self.headers,
+                params=params,
+                timeout=10
+            )
+            
+            if response.status_code in [200, 204]:
+                return True
+            else:
+                st.error(f"Fehler beim Löschen: Status {response.status_code}")
+                return False
         except Exception as e:
             st.error(f"Fehler beim Löschen: {str(e)}")
             return False
@@ -195,15 +198,26 @@ class NeonDatabase:
     def get_db_status(self) -> Dict:
         """Gibt Status der Datenbankverbindung zurück"""
         try:
-            session = self.Session()
-            count = session.query(ShoppingSession).count()
-            session.close()
+            response = requests.get(
+                f"{self.api_url}/tables/shopping_sessions/rows",
+                headers=self.headers,
+                timeout=5
+            )
             
-            return {
-                'connected': True,
-                'session_count': count,
-                'error': None
-            }
+            if response.status_code == 200:
+                sessions = response.json()
+                count = len(sessions) if isinstance(sessions, list) else 0
+                return {
+                    'connected': True,
+                    'session_count': count,
+                    'error': None
+                }
+            else:
+                return {
+                    'connected': False,
+                    'session_count': 0,
+                    'error': f"Status {response.status_code}"
+                }
         except Exception as e:
             return {
                 'connected': False,
@@ -211,17 +225,35 @@ class NeonDatabase:
                 'error': str(e)
             }
 
-def get_neon_db() -> Optional[NeonDatabase]:
-    """Gibt die Neon Database Instanz zur\u00fcck (mit Caching)"""
+
+def get_neon_db() -> Optional[NeonDatabaseConnection]:
+    """Gibt die Neon Database Connection Instanz zurück (mit Caching)"""
     if 'neon_db' not in st.session_state:
         try:
-            db_url = os.getenv('DATABASE_URL') or st.secrets.get('DATABASE_URL')
-            if db_url:
-                st.session_state.neon_db = NeonDatabase(db_url)
-            else:
+            # Versuche, Credentials aus Secrets zu laden
+            api_url = os.getenv('DATA_API_URL') or st.secrets.get('DATA_API_URL')
+            api_key = os.getenv('API_KEY') or st.secrets.get('API_KEY')
+            
+            if not api_url or not api_key:
+                st.error(
+                    "❌ DATA_API_URL und API_KEY nicht gesetzt!\n\n"
+                    "Konfigurieren Sie diese in `.streamlit/secrets.toml`:\n"
+                    "```toml\n"
+                    'DATA_API_URL="https://..."\n'
+                    'API_KEY="napi_..."\n'
+                    "```"
+                )
                 return None
+            
+            st.session_state.neon_db = NeonDatabaseConnection(api_url, api_key)
         except Exception as e:
-            st.error(f"Datenbankverbindung fehlgeschlagen: {str(e)}")
+            st.error(f"❌ Datenbankverbindung fehlgeschlagen:\n\n{str(e)}")
             return None
     
     return st.session_state.neon_db
+
+
+# Legacy class names for backwards compatibility
+class NeonDatabase(NeonDatabaseConnection):
+    """Backwards compatibility alias"""
+    pass

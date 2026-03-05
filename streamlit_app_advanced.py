@@ -1,8 +1,3 @@
-"""
-ERWEITERTE STREAMLIT VERSION mit Laden-Management
-Ermöglicht Verschieben von Artikeln zwischen Läden beim Einkaufen
-"""
-
 import streamlit as st
 import os
 import tempfile
@@ -13,7 +8,6 @@ import pandas as pd
 from io import BytesIO
 import pickle
 
-# Workspace relative imports
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
@@ -26,20 +20,16 @@ from src.models.Laden import Laden
 from src.neon_database import get_neon_db
 
 
-# ============= PERSISTENT STORAGE FUNKTIONEN =============
 SAVE_DIR = Path.home() / ".suku_planung"
 SAVE_DIR.mkdir(exist_ok=True)
 
-# Optional: Umgebungsvariable laden
 from dotenv import load_dotenv
 load_dotenv()
 
 def get_save_file_path(filename: str) -> Path:
-    """Gibt den Pfad für persistente Speicherung zurück"""
     return SAVE_DIR / filename
 
 def save_session_state(filename: str, data: dict) -> bool:
-    """Speichert Session-State in JSON-Datei"""
     try:
         save_path = get_save_file_path(filename)
         with open(save_path, 'w', encoding='utf-8') as f:
@@ -50,7 +40,6 @@ def save_session_state(filename: str, data: dict) -> bool:
         return False
 
 def load_session_state(filename: str) -> dict:
-    """Lädt Session-State aus JSON-Datei"""
     try:
         save_path = get_save_file_path(filename)
         if save_path.exists():
@@ -61,7 +50,6 @@ def load_session_state(filename: str) -> dict:
     return {}
 
 def convert_dict_keys_to_string(d: dict) -> dict:
-    """Konvertiert dict-Keys zu Strings für JSON-Serialisierung"""
     result = {}
     for key, value in d.items():
         if isinstance(key, tuple):
@@ -76,11 +64,9 @@ def convert_dict_keys_to_string(d: dict) -> dict:
     return result
 
 def restore_dict_from_string_keys(d: dict) -> dict:
-    """Versucht String-Keys zurück zu Tuples zu konvertieren"""
     result = {}
     for key, value in d.items():
         try:
-            # Versuche Key als Tuple zu interpretieren
             if key.startswith("(") and key.endswith(")"):
                 restored_key = eval(key)
             else:
@@ -94,7 +80,6 @@ def restore_dict_from_string_keys(d: dict) -> dict:
             result[restored_key] = value
     return result
 
-# Lokale Persistierungs-Funktion (Fallback)
 @st.cache_resource
 def load_persisted_state():
     """Lädt lokal gespeicherte Änderungen"""
@@ -103,7 +88,6 @@ def load_persisted_state():
         return restore_dict_from_string_keys(state)
     return {}
 
-# Streamlit Page Configuration
 st.set_page_config(
     page_title="Zeltlager SUKU Planung ADVANCED",
     layout="wide",
@@ -113,7 +97,6 @@ st.set_page_config(
     }
 )
 
-# Custom CSS für besseres Design
 st.markdown("""
 <style>
     .einkaufsliste-item {
@@ -129,7 +112,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🍽️ Zeltlager SUKU - Essensplanung ADVANCED")
+# st.title("🍽️ Zeltlager SUKU - Essensplanung ADVANCED")
+st.title("ADVANCED")
 
 # Initialize session state
 if "tage" not in st.session_state:
@@ -152,6 +136,63 @@ if "use_neon_db" not in st.session_state:
     st.session_state.use_neon_db = False
 if "neon_connected" not in st.session_state:
     st.session_state.neon_connected = False
+if "last_excel_filename" not in st.session_state:
+    st.session_state.last_excel_filename = None
+if "excel_loaded_from_disk" not in st.session_state:
+    st.session_state.excel_loaded_from_disk = False
+
+# Initialize Konfigurationswerte in Session State
+if "config_workbooks" not in st.session_state:
+    st.session_state.config_workbooks = ", ".join(workbooks_default)
+if "config_laden" not in st.session_state:
+    st.session_state.config_laden = ", ".join(laden_default)
+if "config_lieferanten" not in st.session_state:
+    st.session_state.config_lieferanten = ", ".join(lieferanten_default)
+
+# Versuche lokal gespeicherte Excel-Daten zu laden beim App-Start
+# (Nur wenn noch keine Daten geladen wurden)
+if not st.session_state.einkaufslisten_dict:
+    try:
+        saved_excel_data = load_session_state("excel_einkaufslisten.json")
+        if saved_excel_data and "einkaufslisten_dict" in saved_excel_data:
+            # WICHTIG: tage wird NICHT direkt aus JSON geladen, aber reconstruiert aus tage_info
+            st.session_state.einkaufslisten_dict = restore_dict_from_string_keys(saved_excel_data.get("einkaufslisten_dict", {}))
+            st.session_state.last_excel_filename = saved_excel_data.get("filename", None)
+            st.session_state.config_workbooks = saved_excel_data.get("config_workbooks", st.session_state.config_workbooks)
+            st.session_state.config_laden = saved_excel_data.get("config_laden", st.session_state.config_laden)
+            st.session_state.config_lieferanten = saved_excel_data.get("config_lieferanten", st.session_state.config_lieferanten)
+            
+            # Reconstruiere minimale Tag-Objekte aus tage_info für die Tabs
+            tage_info = saved_excel_data.get("tage_info", [])
+            if tage_info:
+                # Erstelle minimale Mock-Objekte mit nur den benötigten Attributen
+                class MinimalTag:
+                    def __init__(self, wochentag, gericht_names):
+                        self.wochentag = wochentag
+                        self.gericht_names = gericht_names
+                
+                minimal_tage = [MinimalTag(ti["wochentag"], ti["gericht_names"]) for ti in tage_info]
+                st.session_state.tage = minimal_tage
+    except Exception as e:
+        st.warning(f"⚠️ Fehler beim Laden der Excel-Daten: {str(e)}")
+
+# Wenn tage immer noch None ist aber einkaufslisten_dict vorhanden, versuche tage zu rekonstruieren
+# (Dies passiert z.B. wenn der Tab neu geladen wird)
+if st.session_state.tage is None and st.session_state.einkaufslisten_dict:
+    try:
+        saved_excel_data = load_session_state("excel_einkaufslisten.json")
+        if saved_excel_data:
+            tage_info = saved_excel_data.get("tage_info", [])
+            if tage_info:
+                class MinimalTag:
+                    def __init__(self, wochentag, gericht_names):
+                        self.wochentag = wochentag
+                        self.gericht_names = gericht_names
+                
+                minimal_tage = [MinimalTag(ti["wochentag"], ti["gericht_names"]) for ti in tage_info]
+                st.session_state.tage = minimal_tage
+    except Exception as e:
+        pass  # Stille Behandlung - Daten sind trotzdem vorhanden
 
 # Versuche Neon DB zu verbinden
 @st.cache_resource
@@ -213,23 +254,44 @@ with st.sidebar:
     
     uploaded_file = st.file_uploader("📊 Excel-Datei hochladen", type=["xlsx", "xls", "xlsm"], key="excel_upload")
     
+    # Button um neue Datei hochzuladen
+    if st.session_state.last_excel_filename:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.caption(f"📄 Geladen: {st.session_state.last_excel_filename[:20]}")
+        with col2:
+            if st.button("🔄 Neue Datei"):
+                st.session_state.last_excel_filename = None
+                st.session_state.excel_loaded_from_disk = False
+                st.session_state.tage = None
+                st.session_state.einkaufslisten_dict = {}
+                st.rerun()
+    
+    st.divider()
+    
     workbooks = st.text_input(
         "Excel Blätter (kommagetrennt):",
-        value=", ".join(workbooks_default)
+        value=st.session_state.config_workbooks,
+        key="input_workbooks"
     )
     workbooks_list = [wb.strip() for wb in workbooks.split(",")]
+    st.session_state.config_workbooks = workbooks  # Speichere die aktuellen Eingaben
     
     läden = st.text_input(
         "Läden (kommagetrennt):",
-        value=", ".join(laden_default)
+        value=st.session_state.config_laden,
+        key="input_laden"
     )
     läden_list = [l.strip() for l in läden.split(",")]
+    st.session_state.config_laden = läden  # Speichere die aktuellen Eingaben
     
     lieferanten = st.text_input(
         "Lieferanten (kommagetrennt):",
-        value=", ".join(lieferanten_default)
+        value=st.session_state.config_lieferanten,
+        key="input_lieferanten"
     )
     lieferanten_list = [lf.strip() for lf in lieferanten.split(",")]
+    st.session_state.config_lieferanten = lieferanten  # Speichere die aktuellen Eingaben
     
     st.divider()
     st.header("📊 Session Info")
@@ -243,38 +305,61 @@ with st.sidebar:
 
 # ============= DATEI VERARBEITUNG =============
 if uploaded_file is not None:
-    with tempfile.TemporaryDirectory() as tmpdir:
-        file_path = os.path.join(tmpdir, uploaded_file.name)
-        with open(file_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-        
-        try:
-            excel = Excel()
-            excel.read_file(file_path)
+    # Prüfe, ob es eine neue Datei ist (nicht bereits geladen)
+    if st.session_state.last_excel_filename != uploaded_file.name:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            file_path = os.path.join(tmpdir, uploaded_file.name)
+            with open(file_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
             
-            # Tage aus Workbooks laden
-            tage = []
-            for workbook in workbooks_list:
-                excel.read_page(workbook)
-                tag = excel.read_tag()
-                tage.append(tag)
-            st.session_state.tage = tage
-            
-            # Einkaufslisten nach Läden erstellen
-            einkaufsliste = Einkaufsliste()
-            einkaufslisten_dict = {}
-            for laden in läden_list:
-                einkaufslisten_dict[laden] = einkaufsliste.create_einkaufsliste(tage, laden)
-            st.session_state.einkaufslisten_dict = einkaufslisten_dict
-            
-            st.sidebar.success("✅ Datei erfolgreich verarbeitet!")
-            
-        except Exception as e:
-            st.sidebar.error(f"❌ Fehler beim Verarbeiten: {str(e)}")
-            st.sidebar.write(str(e))
+            try:
+                excel = Excel()
+                excel.read_file(file_path)
+                
+                # Tage aus Workbooks laden
+                tage = []
+                tage_info = []  # Speichere nur die Wochentag-Namen
+                for workbook in workbooks_list:
+                    excel.read_page(workbook)
+                    tag = excel.read_tag()
+                    tage.append(tag)
+                    tage_info.append({
+                        "wochentag": tag.wochentag,
+                        "gericht_count": len(tag.gericht),
+                        "gericht_names": [g.gerichtname for g in tag.gericht]
+                    })
+                st.session_state.tage = tage
+                
+                # Einkaufslisten nach Läden erstellen
+                einkaufsliste = Einkaufsliste()
+                einkaufslisten_dict = {}
+                for laden in läden_list:
+                    einkaufslisten_dict[laden] = einkaufsliste.create_einkaufsliste(tage, laden)
+                st.session_state.einkaufslisten_dict = einkaufslisten_dict
+                
+                # Speichere die verarbeiteten Daten lokal
+                st.session_state.last_excel_filename = uploaded_file.name
+                excel_cache = {
+                    "filename": uploaded_file.name,
+                    # WICHTIG: tage wird NICHT gespeichert, da es komplexe Python-Objekte sind
+                    # Diese werden nur beim Upload regeneriert
+                    "einkaufslisten_dict": convert_dict_keys_to_string(einkaufslisten_dict),
+                    "tage_info": tage_info,  # Speichere nur Wochentag-Namen und Gericht-Infos
+                    "config_workbooks": workbooks,
+                    "config_laden": läden,
+                    "config_lieferanten": lieferanten
+                }
+                save_session_state("excel_einkaufslisten.json", excel_cache)
+                st.session_state.excel_loaded_from_disk = True
+                
+                st.sidebar.success("✅ Datei erfolgreich verarbeitet!")
+                
+            except Exception as e:
+                st.sidebar.error(f"❌ Fehler beim Verarbeiten: {str(e)}")
+                st.sidebar.write(str(e))
 
 # ============= HAUPTINHALT =============
-if st.session_state.tage is None:
+if not st.session_state.einkaufslisten_dict:
     st.info("📁 Bitte laden Sie zuerst eine Excel-Datei hoch (siehe Sidebar)")
 else:
     # Tabs für verschiedene Ansichten
@@ -448,55 +533,75 @@ else:
         
         if st.session_state.tage:
             for tag in st.session_state.tage:
-                with st.expander(f"📅 {tag.wochentag}", expanded=False):
-                    for gericht in tag.gericht:
-                        st.subheader(f"🍴 {gericht.gerichtname}")
-                        
-                        # Zutaten als Tabelle
-                        zutat_data = []
-                        for zutat in gericht.zutat:
-                            zutat_data.append({
-                                "Artikel": zutat.artikelname,
-                                "Menge": zutat.menge,
-                                "Einheit": zutat.einheit,
-                                "Laden": zutat.lieferant,
-                                "Kategorie": zutat.kategorie
-                            })
-                        
-                        if zutat_data:
-                            st.dataframe(zutat_data, width='stretch', hide_index=True)
+                # Check ob es ein echtes Tag-Objekt mit gericht Attribut ist oder nur minimal
+                if hasattr(tag, 'gericht') and tag.gericht:
+                    with st.expander(f"📅 {tag.wochentag}", expanded=False):
+                        for gericht in tag.gericht:
+                            st.subheader(f"🍴 {gericht.gerichtname}")
+                            
+                            # Zutaten als Tabelle
+                            zutat_data = []
+                            for zutat in gericht.zutat:
+                                zutat_data.append({
+                                    "Artikel": zutat.artikelname,
+                                    "Menge": zutat.menge,
+                                    "Einheit": zutat.einheit,
+                                    "Laden": zutat.lieferant,
+                                    "Kategorie": zutat.kategorie
+                                })
+                            
+                            if zutat_data:
+                                st.dataframe(zutat_data, width='stretch', hide_index=True)
+                            else:
+                                st.info("Keine Zutaten")
+                else:
+                    # Minimal-Objekt - nutze nur die gespeicherten Gericht-Namen
+                    gericht_names = getattr(tag, 'gericht_names', [])
+                    with st.expander(f"📅 {tag.wochentag}", expanded=False):
+                        if gericht_names:
+                            for gericht_name in gericht_names:
+                                st.subheader(f"🍴 {gericht_name}")
+                                st.info("📁 Essensplan wird nach neuem Upload mit allen Details angezeigt")
                         else:
-                            st.info("Keine Zutaten")
+                            st.info("Keine Gerichte für diesen Tag")
+        else:
+            st.info("📁 Essensplan wird nach dem Upload einer Excel-Datei angezeigt")
     
     # ============= TAB 3: LIEFERANTEN =============
     with tab3:
         st.header("🚚 Übersicht Lieferanten")
         
         if st.session_state.tage:
-            lieferantenliste = Lieferantenliste()
-            try:
-                for lieferant_name in lieferanten_list:
-                    lieferanten_dict_temp = lieferantenliste.create_lieferantenliste(
-                        st.session_state.tage,
-                        lieferant_name
-                    )
-                    
-                    with st.expander(f"🚚 {lieferant_name}", expanded=False):
-                        if lieferanten_dict_temp:
-                            lieferant_data = []
-                            for zutat_info in lieferanten_dict_temp.values():
-                                lieferant_data.append({
-                                    "Artikel": zutat_info["artikelname"],
-                                    "Menge": zutat_info.get("menge", 0),
-                                    "Einheit": zutat_info.get("einheit", ""),
-                                    "Kategorie": zutat_info.get("kategorie", "")
-                                })
-                            
-                            st.dataframe(lieferant_data, width='stretch', hide_index=True)
-                        else:
-                            st.info("Keine Artikel")
-            except Exception as e:
-                st.warning(f"Fehler: {str(e)}")
+            # Check ob tage echte Objekte sind (mit Lieferanten-Infos)
+            if hasattr(st.session_state.tage[0], 'gericht') and st.session_state.tage[0].gericht:
+                lieferantenliste = Lieferantenliste()
+                try:
+                    for lieferant_name in lieferanten_list:
+                        lieferanten_dict_temp = lieferantenliste.create_lieferantenliste(
+                            st.session_state.tage,
+                            lieferant_name
+                        )
+                        
+                        with st.expander(f"🚚 {lieferant_name}", expanded=False):
+                            if lieferanten_dict_temp:
+                                lieferant_data = []
+                                for zutat_info in lieferanten_dict_temp.values():
+                                    lieferant_data.append({
+                                        "Artikel": zutat_info["artikelname"],
+                                        "Menge": zutat_info.get("menge", 0),
+                                        "Einheit": zutat_info.get("einheit", ""),
+                                        "Kategorie": zutat_info.get("kategorie", "")
+                                    })
+                                
+                                st.dataframe(lieferant_data, width='stretch', hide_index=True)
+                            else:
+                                st.info("Keine Artikel")
+                except Exception as e:
+                    st.warning(f"Fehler: {str(e)}")
+            else:
+                st.info("📁 Lieferantenübersicht wird nach neuem Excel-Upload mit allen Details angezeigt")
+        else:
+            st.info("📁 Lieferantenübersicht wird nach dem Upload einer Excel-Datei angezeigt")
     
     # ============= TAB 4: DOWNLOAD =============
     with tab4:
@@ -507,24 +612,28 @@ else:
         # Kalkulation PDF
         with col1:
             if st.button("📊 Kalkulation als PDF", use_container_width=True):
-                with tempfile.TemporaryDirectory() as tmpdir:
-                    try:
-                        calculation = Calculation()
-                        calculation.save_as_pdf(st.session_state.tage, tmpdir)
-                        
-                        pdf_path = os.path.join(tmpdir, "Gesamt_Calc.pdf")
-                        if os.path.exists(pdf_path):
-                            with open(pdf_path, "rb") as pdf_file:
-                                st.download_button(
-                                    label="⬇️ Herunterladen",
-                                    data=pdf_file.read(),
-                                    file_name=f"Kalkulation_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-                                    mime="application/pdf",
-                                    use_container_width=True
-                                )
-                            st.success("✅ PDF erstellt!")
-                    except Exception as e:
-                        st.error(f"Fehler: {str(e)}")
+                # Check ob tage echte Objekte mit gericht Attributen hat
+                if st.session_state.tage and hasattr(st.session_state.tage[0], 'gericht'):
+                    with tempfile.TemporaryDirectory() as tmpdir:
+                        try:
+                            calculation = Calculation()
+                            calculation.save_as_pdf(st.session_state.tage, tmpdir)
+                            
+                            pdf_path = os.path.join(tmpdir, "Gesamt_Calc.pdf")
+                            if os.path.exists(pdf_path):
+                                with open(pdf_path, "rb") as pdf_file:
+                                    st.download_button(
+                                        label="⬇️ Herunterladen",
+                                        data=pdf_file.read(),
+                                        file_name=f"Kalkulation_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                                        mime="application/pdf",
+                                        use_container_width=True
+                                    )
+                                st.success("✅ PDF erstellt!")
+                        except Exception as e:
+                            st.error(f"Fehler: {str(e)}")
+                else:
+                    st.warning("⚠️ PDF nur nach neuem Excel-Upload mit vollständigen Daten verfügbar")
         
         # Einkaufsliste CSV Export
         with col2:
@@ -668,9 +777,9 @@ else:
         st.divider()
         st.subheader("�️ Datenbank Status")
         
-        if st.session_state.use_supabase_db and supabase_db:
-            st.success("✅ Supabase PostgreSQL Datenbank verbunden")
-            db_status = supabase_db.get_db_status()
+        if st.session_state.use_neon_db and neon_db:
+            st.success("✅ Neon Data API Datenbank verbunden")
+            db_status = neon_db.get_db_status()
             
             col_db1, col_db2 = st.columns(2)
             with col_db1:
@@ -680,7 +789,7 @@ else:
             
             # Liste gespeicherte Sessions
             with st.expander("📋 Alle gespeicherten Sessions"):
-                sessions = supabase_db.list_sessions()
+                sessions = neon_db.list_sessions()
                 if sessions:
                     for sess in sessions:
                         col_info1, col_info2, col_info3 = st.columns([2, 2, 1])
@@ -690,14 +799,14 @@ else:
                             st.caption(sess['updated_at'][:19] if sess['updated_at'] else 'N/A')
                         with col_info3:
                             if st.button(f"🗑️ Löschen", key=f"del_{sess['session_id']}"):
-                                if supabase_db.delete_session(sess['session_id']):
+                                if neon_db.delete_session(sess['session_id']):
                                     st.success("Gelöscht!")
                                     st.rerun()
                 else:
                     st.info("Keine Sessions gespeichert")
         else:
-            st.warning("⚠️ Supabase Datenbank nicht verbunden - nur lokale Speicherung aktiv")
-            st.info("📌 Konfigurieren Sie DATABASE_URL in `.streamlit/secrets.toml`")
+            st.warning("⚠️ Neon Data API nicht verbunden - nur lokale Speicherung aktiv")
+            st.info("📌 Konfigurieren Sie DATA_API_URL und API_KEY in `.streamlit/secrets.toml`")
         
         st.divider()
         st.subheader("📋 Session Informationen")
@@ -710,7 +819,7 @@ else:
             "Geänderte Artikel": str(len(st.session_state.artikel_modifikationen)),
             "Abgehakte Artikel": str(sum(len(items) for items in st.session_state.abgehakte_artikel.values())),
             "Letzte Speicherung": st.session_state.last_save_time.strftime('%H:%M:%S') if st.session_state.last_save_time else "Noch nicht gespeichert",
-            "Speicherort": "Supabase DB + Lokal" if st.session_state.use_supabase_db else "Lokal"
+            "Speicherort": "Neon Data API + Lokal" if st.session_state.use_neon_db else "Lokal"
         }
         
         df_info = pd.DataFrame(list(info_data.items()), columns=["Eigenschaft", "Wert"])

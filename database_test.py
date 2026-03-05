@@ -1,20 +1,15 @@
 import requests
-import json
 
-NEON_API_KEY = "DEIN_API_KEY"
-NEON_PROJECT_ENDPOINT = "https://ep-square-cloud-aia2lc9m.apirest.c-4.us-east-1.aws.neon.tech/neondb/rest/v1"
+API_KEY = "napi_kgwxm8iah53n6jt527kcioqmbkaimlhi37xh7ct6qub583gc5llis4rxe9206brq"
 
-query = {
-    "query": "SELECT NOW();"
+headers = {
+    "Authorization": f"Bearer {API_KEY}",
+    "Accept": "application/json"
 }
 
-response = requests.post(
-    NEON_PROJECT_ENDPOINT,
-    headers={
-        "Authorization": f"Bearer {NEON_API_KEY}",
-        "Content-Type": "application/json"
-    },
-    data=json.dumps(query)
+response = requests.get(
+    "https://console.neon.tech/api/v2/projects",
+    headers=headers
 )
 
 print(response.json())
